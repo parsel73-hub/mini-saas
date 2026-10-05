@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+
+{% block title %}Статистика — {{ survey.title }}{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="stats-header" style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;">
+        <div>
+            <h1 style="margin-bottom:4px;">{{ survey.title }}</h1>
+            {% if survey.description %}
+            <p class="muted" style="margin-top:0;">{{ survey.description }}</p>
+            {% endif %}
+            <p class="muted">Ссылка: <code>/survey/{{ survey.slug }}</code></p>
+        </div>
+        <a href="/dashboard" class="btn btn-secondary">← К моим опросам</a>
+    </div>
+
+    <div class="total-box">
+        <div class="total-number">{{ stats.total_submissions }}</div>
+        <div class="total-label">всего отправок</div>
+    </div>
+
+    {% if not stats.questions %}
+    <p class="muted">В опросе нет вопросов.</p>
+    {% endif %}
+
+    {% for q in stats.questions %}
+    <section class="question-stats">
+        <h2>{{ loop.index }}. {{ q.text }}</h2>
+
+        {% if q.type in ('single', 'multiple') %}
+            {% set options = q.options or [] %}
+            {% if options and options | sum(attribute='count') > 0 %}
+            <div class="chart-grid">
+                <div class="chart-wrap">
+                    <canvas id="chart-q{{ q.id }}" width="320" height="320"></canvas>
+                </div>
+                <table class="stats-table">
+                    <thead>
+                        <tr><th>Вариант</th><th>Ответов</th><th>Доля</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for opt in options %}
+                        <tr>
+                            <td>{{ opt.text }}</td>
+                            <td>{{ opt.count }}</td>
+                            <td>{{ opt.percent }}%</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <script type="application/json" data-chart
+                    data-canvas="chart-q{{ q.id }}" data-type="pie">{{ {
+                        'labels': options | map(attribute='text') | list,
+                        'values': options | map(attribute='count') | list,
+                        'percents': options | map(attribute='percent') | list,
+                        'label': q.text
+                    } | tojson }}</script>
+            {% else %}
+            <p class="muted">Пока нет ответов на этот вопрос.</p>
+            {% endif %}
+
+        {% elif q.type == 'text' %}
+            {% if q.answers %}
+            <ul class="text-answers">
+                {% for answer in q.answers %}
+                <li>{{ answer }}</li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p class="muted">Пока нет текстовых ответов.</p>
+            {% endif %}
+        {% endif %}
+    </section>
+    {% endfor %}
+
+    <section class="question-stats">
+        <h2>Последние отправки</h2>
+        {% if stats.recent %}
+        <table class="stats-table">
+            <thead>
+                <tr><th>Сессия</th><th>Дата</th><th>Ответы</th></tr>
+            </thead>
+            <tbody>
+                {% for row in stats.recent %}
+                <tr>
+                    <td><code>{{ row.session }}</code></td>
+                    <td>{{ row.submitted_at.strftime('%d.%m.%Y %H:%M') if row.submitted_at else '—' }}</td>
+                    <td>{{ row.summary }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="muted">Отправок пока нет.</p>
+        {% endif %}
+    </section>
+
+    <p style="margin-top:24px;"><a href="/dashboard">← Вернуться к моим опросам</a></p>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="/static/js/chart_init.js"></script>
+
+<style>
+.total-box {
+    text-align: center;
+    margin: 24px 0 32px;
+    padding: 20px;
+    background: #eef4ff;
+    border-radius: 8px;
+}
+.total-number {
+    font-size: 48px;
+    font-weight: 700;
+    color: #2c7be5;
+    line-height: 1;
+}
+.total-label {
+    color: #555;
+    margin-top: 6px;
+}
+.question-stats {
+    border-top: 1px solid #eee;
+    padding-top: 16px;
+    margin-top: 16px;
+}
+.chart-grid {
+    display: flex;
+    gap: 24px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+.chart-wrap {
+    width: 320px;
+    height: 320px;
+    flex: 0 0 auto;
+}
+.stats-table {
+    width: 100%;
+    border-collapse: collapse;
+    flex: 1 1 240px;
+}
+.stats-table th,
+.stats-table td {
+    padding: 8px 10px;
+    border-bottom: 1px solid #eee;
+    text-align: left;
+}
+.stats-table th {
+    border-bottom: 2px solid #ddd;
+}
+.text-answers {
+    margin: 0;
+    padding-left: 20px;
+}
+.text-answers li {
+    margin-bottom: 6px;
+}
+.btn-secondary {
+    background: #6c757d;
+}
+</style>
+{% endblock %}

@@ -6,7 +6,7 @@ URL layout (по ТЗ):
     GET      /survey/{slug}          — respondent, NO auth
     POST     /survey/{slug}/submit   — respondent, NO auth (stub → thank-you)
     GET      /survey/{slug}/thank-you — respondent, NO auth
-    GET      /survey/{slug}/stats    — creator only (placeholder for Этап 5)
+    GET      /survey/{slug}/stats    — creator only (moved to analytics/router.py)
 """
 from uuid import uuid4
 
@@ -265,28 +265,4 @@ def thank_you(
     templates = get_templates()
     return templates.TemplateResponse(
         request, "surveys/thank_you.html", {"survey": survey}
-    )
-
-
-@router.get("/survey/{slug}/stats", response_class=HTMLResponse)
-def survey_stats(
-    request: Request,
-    slug: str,
-    current_user: CurrentUser,
-    db: Session = Depends(get_db),
-):
-    """Placeholder statistics page for the creator (full version — Этап 5)."""
-    survey = _get_survey_or_none(db, slug)
-    templates = get_templates()
-    if survey is None:
-        return templates.TemplateResponse(
-            request,
-            "404.html",
-            {"error": "Опрос не найден или недоступен."},
-            status_code=404,
-        )
-    return templates.TemplateResponse(
-        request,
-        "surveys/stats.html",
-        {"user": current_user, "survey": survey},
     )
