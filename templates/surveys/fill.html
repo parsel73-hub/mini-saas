@@ -25,7 +25,8 @@
                         <input type="radio" class="form-check-input"
                                id="q{{ question.id }}_opt{{ option.id }}"
                                name="answer_{{ question.id }}"
-                               value="{{ option.id }}">
+                               value="{{ option.id }}"
+                               {% if entered.get(question.id) == option.id|string %}checked{% endif %}>
                         <label class="form-check-label" for="q{{ question.id }}_opt{{ option.id }}">{{ option.text }}</label>
                     </div>
                     {% endfor %}
@@ -38,7 +39,8 @@
                         <input type="checkbox" class="form-check-input"
                                id="q{{ question.id }}_opt{{ option.id }}"
                                name="answer_{{ question.id }}"
-                               value="{{ option.id }}">
+                               value="{{ option.id }}"
+                               {% if option.id|string in entered.get(question.id, []) %}checked{% endif %}>
                         <label class="form-check-label" for="q{{ question.id }}_opt{{ option.id }}">{{ option.text }}</label>
                     </div>
                     {% endfor %}
@@ -50,7 +52,7 @@
                               id="q{{ question.id }}_text"
                               name="answer_{{ question.id }}"
                               rows="3"
-                              placeholder="Введите ваш ответ"></textarea>
+                              placeholder="Введите ваш ответ">{{ entered.get(question.id, '') }}</textarea>
                 </div>
             {% endif %}
         </div>

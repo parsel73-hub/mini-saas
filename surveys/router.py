@@ -8,13 +8,16 @@ URL layout (по ТЗ):
     GET      /survey/{slug}/thank-you — respondent, NO auth
     GET      /survey/{slug}/stats    — creator only (placeholder for Этап 5)
 """
+from uuid import uuid4
+
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from auth.deps import CurrentUser, get_templates
 from database.session import get_db
-from surveys.services import create_survey, parse_questions
+from surveys.respondent import has_submitted, set_submitted_flag
+from surveys.services import create_survey, parse_questions, save_submission
 
 router = APIRouter()
 
@@ -28,6 +31,38 @@ def _get_survey_or_none(db: Session, slug: str):
         .filter(Survey.slug == slug, Survey.is_active.is_(True))
         .first()
     )
+
+
+def _form_to_dict(form) -> dict:
+    """Collect form data, keeping repeated fields as lists.
+
+    ``dict(form)`` collapses repeated keys (e.g. checkbox options) to the last
+    value, so we iterate ``multi_items`` and group duplicates ourselves.
+    """
+    form_data: dict = {}
+    for key, value in form.multi_items():
+        if key in form_data:
+            if isinstance(form_data[key], list):
+                form_data[key].append(value)
+            else:
+                form_data[key] = [form_data[key], value]
+        else:
+            form_data[key] = value
+    return form_data
+
+
+def _entered_answers(survey, form_data: dict) -> dict:
+    """Build {question_id: submitted_value} for re-rendering the form."""
+    entered: dict = {}
+    for question in survey.questions:
+        raw = form_data.get(f"answer_{question.id}")
+        if raw is None:
+            continue
+        if question.type == "multiple":
+            entered[question.id] = raw if isinstance(raw, list) else [raw]
+        else:
+            entered[question.id] = raw
+    return entered
 
 
 @router.get("/dashboard", response_class=HTMLResponse)
@@ -71,17 +106,7 @@ async def create_survey_submit(
 ):
     """Handle survey creation form submission."""
     form = await request.form()
-    # Preserve repeated fields (e.g. question_N_options) as lists instead of
-    # letting dict() collapse them to the last value.
-    form_data: dict = {}
-    for key, value in form.multi_items():
-        if key in form_data:
-            if isinstance(form_data[key], list):
-                form_data[key].append(value)
-            else:
-                form_data[key] = [form_data[key], value]
-        else:
-            form_data[key] = value
+    form_data = _form_to_dict(form)
 
     title = str(form_data.get("title", "")).strip()
     description = str(form_data.get("description", "")).strip()
@@ -155,8 +180,20 @@ def fill_survey(
             {"error": "Опрос не найден или недоступен."},
             status_code=404,
         )
+
+    # Double-submission protection: a browser that already answered sees a
+    # friendly notice instead of the form again.
+    if has_submitted(request, slug, survey.id):
+        return templates.TemplateResponse(
+            request,
+            "surveys/already_submitted.html",
+            {"survey": survey},
+        )
+
     return templates.TemplateResponse(
-        request, "surveys/fill.html", {"survey": survey}
+        request,
+        "surveys/fill.html",
+        {"survey": survey, "entered": {}},
     )
 
 
@@ -166,9 +203,10 @@ async def submit_survey(
     slug: str,
     db: Session = Depends(get_db),
 ):
-    """Stub submit handler: real answer saving arrives on Этап 4.
+    """Validate and persist answers, then redirect (PRG pattern).
 
-    For now it only redirects the respondent to the thank-you page.
+    Respondents are anonymous (ТЗ): no auth checks here. A signed
+    ``respondent_{slug}`` cookie guards against double submission.
     """
     survey = _get_survey_or_none(db, slug)
     templates = get_templates()
@@ -179,7 +217,41 @@ async def submit_survey(
             {"error": "Опрос не найден или недоступен."},
             status_code=404,
         )
-    return RedirectResponse(url=f"/survey/{slug}/thank-you", status_code=303)
+
+    if has_submitted(request, slug, survey.id):
+        return templates.TemplateResponse(
+            request,
+            "surveys/already_submitted.html",
+            {"survey": survey},
+            status_code=409,
+        )
+
+    form = await request.form()
+    form_data = _form_to_dict(form)
+    respondent_session = uuid4().hex
+
+    try:
+        save_submission(db, survey, form_data, respondent_session)
+        db.commit()
+    except ValueError as exc:
+        db.rollback()
+        # Re-render the form with the error and the entered answers preserved.
+        return templates.TemplateResponse(
+            request,
+            "surveys/fill.html",
+            {
+                "survey": survey,
+                "error": str(exc),
+                "entered": _entered_answers(survey, form_data),
+            },
+            status_code=422,
+        )
+
+    response = RedirectResponse(
+        url=f"/survey/{slug}/thank-you", status_code=303
+    )
+    set_submitted_flag(response, slug, survey.id)
+    return response
 
 
 @router.get("/survey/{slug}/thank-you", response_class=HTMLResponse)

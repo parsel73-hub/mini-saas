@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional
 
 from sqlalchemy.orm import Session
 
-from database.models import Option, Question, Survey
+from database.models import Answer, Option, Question, Survey
 from surveys.service.slug_service import generate_slug, generate_unique_slug
 
 __all__ = [
@@ -16,6 +16,7 @@ __all__ = [
     "parse_questions",
     "validate_questions",
     "create_survey",
+    "save_submission",
 ]
 
 
@@ -130,3 +131,103 @@ def create_survey(
             )
 
     return survey
+
+
+def _normalize_values(raw: Any) -> List[str]:
+    """Return repeated form values as a flat list of strings."""
+    if raw is None:
+        return []
+    if isinstance(raw, list):
+        return [str(v) for v in raw if str(v).strip() != ""]
+    return [str(raw)] if str(raw).strip() != "" else []
+
+
+def save_submission(
+    db: Session,
+    survey: Survey,
+    form_data: Dict[str, Any],
+    respondent_session: str,
+) -> List[Answer]:
+    """Validate and persist all answers of one submission.
+
+    ``form_data`` maps ``answer_{question_id}`` to the submitted value (a
+    string, or a list of strings for checkbox questions). Every row of the
+    submission shares the same ``respondent_session`` and is flushed in a
+    single transaction (the caller commits).
+
+    Validation (per ТЗ):
+      * every "single" question must be answered;
+      * every chosen option id must belong to its question.
+
+    Raises ``ValueError`` with a friendly message when validation fails.
+    """
+    errors: List[str] = []
+    answers: List[Answer] = []
+
+    for question in survey.questions:
+        raw = form_data.get(f"answer_{question.id}")
+        valid_option_ids = {opt.id for opt in question.options}
+
+        if question.type == "single":
+            if not _normalize_values(raw):
+                errors.append(f"Ответьте на вопрос «{question.text}».")
+                continue
+            try:
+                option_id = int(raw)
+            except (TypeError, ValueError):
+                errors.append(f"Недопустимый вариант в вопросе «{question.text}».")
+                continue
+            if option_id not in valid_option_ids:
+                errors.append(f"Недопустимый вариант в вопросе «{question.text}».")
+                continue
+            answers.append(
+                Answer(
+                    survey_id=survey.id,
+                    question_id=question.id,
+                    option_id=option_id,
+                    respondent_session=respondent_session,
+                )
+            )
+
+        elif question.type == "multiple":
+            for value in _normalize_values(raw):
+                try:
+                    option_id = int(value)
+                except (TypeError, ValueError):
+                    errors.append(
+                        f"Недопустимый вариант в вопросе «{question.text}»."
+                    )
+                    continue
+                if option_id not in valid_option_ids:
+                    errors.append(
+                        f"Недопустимый вариант в вопросе «{question.text}»."
+                    )
+                    continue
+                answers.append(
+                    Answer(
+                        survey_id=survey.id,
+                        question_id=question.id,
+                        option_id=option_id,
+                        respondent_session=respondent_session,
+                    )
+                )
+
+        elif question.type == "text":
+            for value in _normalize_values(raw):
+                answers.append(
+                    Answer(
+                        survey_id=survey.id,
+                        question_id=question.id,
+                        text_value=value,
+                        respondent_session=respondent_session,
+                    )
+                )
+
+    if errors:
+        raise ValueError(" ".join(errors))
+
+    for answer in answers:
+        db.add(answer)
+    db.flush()
+
+    return answers
