@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block title %}Спасибо!{% endblock %}
+
+{% block content %}
+<div class="card" style="text-align:center;padding:40px;">
+    <h1 style="color:#28a745;">Спасибо за ответы!</h1>
+    <p style="font-size:18px;color:#666;margin:20px 0;">Ваши ответы сохранены.</p>
+    {% if survey %}
+    <p style="color:#888;">Опрос: <strong>{{ survey.title }}</strong></p>
+    {% endif %}
+    <div style="margin-top:30px;">
+        <a href="/" class="btn btn-primary">На главную</a>
+    </div>
+</div>
+{% endblock %}

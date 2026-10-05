@@ -5,14 +5,16 @@ Run with:
 """
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI
-from fastapi.responses import HTMLResponse
+from fastapi import Depends, FastAPI, Request
+from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
+from auth.deps import _LoginRequired
 from auth.router import router as auth_router
 from database.session import get_db, init_db
+from surveys.router import router as surveys_router
 
 
 @asynccontextmanager
@@ -26,6 +28,15 @@ app = FastAPI(title="Мини-SaaS для опросов", lifespan=lifespan)
 
 # Auth routes: register / login / logout / account (Этап 2).
 app.include_router(auth_router)
+
+# Survey routes: create / dashboard / fill / submit (Этап 3).
+app.include_router(surveys_router)
+
+
+@app.exception_handler(_LoginRequired)
+async def login_required_handler(request: Request, exc: _LoginRequired) -> RedirectResponse:
+    """Redirect guests to /login when a creator-only route requires auth."""
+    return RedirectResponse(url="/login", status_code=302)
 
 
 @app.get("/", response_class=HTMLResponse)

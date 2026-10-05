@@ -1,5 +1,6 @@
 """Shared FastAPI dependencies for auth: templates and current user (Этап 2)."""
 import os
+from typing import Annotated
 
 from fastapi import Depends, Request
 from fastapi.templating import Jinja2Templates
@@ -12,6 +13,7 @@ from database.session import get_db
 
 TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
 
+# Jinja2 autoescape only applies to these extensions (ТЗ: .html must be escaped).
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
 
@@ -36,3 +38,37 @@ def get_current_user(
 ) -> User | None:
     """FastAPI dependency: the logged-in user, or None for guests."""
     return resolve_user(request, db)
+
+
+def get_optional_user(
+    request: Request, db: Session = Depends(get_db)
+) -> User | None:
+    """Same as get_current_user, kept for explicit route-signature use."""
+    return resolve_user(request, db)
+
+
+def require_login(
+    request: Request, db: Session = Depends(get_db)
+) -> User:
+    """Dependency for creator-only pages: redirect guests to /login.
+
+    Use for all future survey-creator routes (create survey, stats, dashboard).
+    Survey-filling pages must NOT use this dependency (ТЗ: open to guests).
+    """
+    user = resolve_user(request, db)
+    if user is None:
+        raise _LoginRequired()
+    return user
+
+
+class _LoginRequired(Exception):
+    """Internal marker: triggers a redirect to /login for guests."""
+
+
+# Annotated alias for convenient use in route signatures:
+#     user: CurrentUser
+CurrentUser = Annotated[User, Depends(require_login)]
+
+# Annotated alias for open (guest-visible) routes that still want the user:
+#     user: OptionalUser
+OptionalUser = Annotated[User | None, Depends(get_optional_user)]

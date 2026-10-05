@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+
+{% block title %}Создать опрос{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1>Создать опрос</h1>
+
+    {% if error %}
+    <div class="alert alert-danger">{{ error }}</div>
+    {% endif %}
+
+    <form method="post" action="/surveys/create" id="survey-form">
+        <div class="form-group">
+            <label for="title">Название опроса</label>
+            <input type="text" id="title" name="title" class="form-control" required
+                   value="{{ title or '' }}" placeholder="Например: Отзывы о сервисе">
+        </div>
+
+        <div class="form-group">
+            <label for="description">Описание (необязательно)</label>
+            <textarea id="description" name="description" class="form-control" rows="3"
+                      placeholder="Краткое описание для респондентов">{{ description or '' }}</textarea>
+        </div>
+
+        <h2>Вопросы</h2>
+        <div id="questions-container">
+            {% macro question_block(idx, q) %}
+            <div class="question-block" data-index="{{ idx }}">
+                <div class="question-header">
+                    <h3>Вопрос {{ idx + 1 }}</h3>
+                    <button type="button" class="btn btn-sm btn-danger remove-question">Удалить</button>
+                </div>
+                <div class="form-group">
+                    <label>Текст вопроса</label>
+                    <input type="text" name="question_{{ idx }}_text" class="form-control question-text"
+                           value="{{ q.text if q else '' }}" required placeholder="Введите текст вопроса">
+                </div>
+                <div class="form-group">
+                    <label>Тип вопроса</label>
+                    <select name="question_{{ idx }}_type" class="form-control question-type">
+                        <option value="single" {% if q and q.type == 'single' %}selected{% endif %}>Один вариант</option>
+                        <option value="multiple" {% if q and q.type == 'multiple' %}selected{% endif %}>Несколько вариантов</option>
+                        <option value="text" {% if q and q.type == 'text' %}selected{% endif %}>Свободный ответ</option>
+                    </select>
+                </div>
+                <div class="form-group options-group" {% if q and q.type == 'text' %}style="display:none"{% endif %}>
+                    <label>Варианты ответов</label>
+                    <div class="options-list">
+                        {% set opts = q.options if q and q.options else [''] %}
+                        {% for opt in opts %}
+                        <div class="option-row">
+                            <input type="text" name="question_{{ idx }}_options" class="form-control option-input"
+                                   value="{{ opt }}" placeholder="Вариант ответа">
+                            <button type="button" class="btn btn-sm btn-danger remove-option" title="Удалить вариант">&times;</button>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <button type="button" class="btn btn-sm btn-secondary add-option">+ Вариант</button>
+                </div>
+            </div>
+            {% endmacro %}
+
+            {% if questions %}
+                {% for q in questions %}
+                    {{ question_block(loop.index0, q) }}
+                {% endfor %}
+            {% else %}
+                {{ question_block(0, none) }}
+            {% endif %}
+        </div>
+
+        <button type="button" id="add-question" class="btn btn-secondary">+ Добавить вопрос</button>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Сохранить опрос</button>
+            <a href="/dashboard" class="btn btn-link">Отмена</a>
+        </div>
+    </form>
+</div>
+
+<script>
+(function() {
+    const container = document.getElementById('questions-container');
+    const addQuestionBtn = document.getElementById('add-question');
+
+    // Keep question/option field names aligned with their visual order.
+    function reindex() {
+        const blocks = container.querySelectorAll('.question-block');
+        blocks.forEach(function(block, idx) {
+            block.dataset.index = idx;
+            const header = block.querySelector('.question-header h3');
+            if (header) header.textContent = 'Вопрос ' + (idx + 1);
+
+            const textInput = block.querySelector('.question-text');
+            const typeSelect = block.querySelector('.question-type');
+            if (textInput) textInput.name = 'question_' + idx + '_text';
+            if (typeSelect) typeSelect.name = 'question_' + idx + '_type';
+            block.querySelectorAll('.option-input').forEach(function(opt) {
+                opt.name = 'question_' + idx + '_options';
+            });
+
+            const removeBtn = block.querySelector('.remove-question');
+            if (removeBtn) removeBtn.disabled = blocks.length <= 1;
+        });
+    }
+
+    function toggleOptions(select) {
+        const block = select.closest('.question-block');
+        const group = block.querySelector('.options-group');
+        if (group) group.style.display = select.value === 'text' ? 'none' : 'block';
+    }
+
+    function makeOptionRow() {
+        const row = document.createElement('div');
+        row.className = 'option-row';
+        row.innerHTML =
+            '<input type="text" class="form-control option-input" placeholder="Вариант ответа">' +
+            '<button type="button" class="btn btn-sm btn-danger remove-option" title="Удалить вариант">&times;</button>';
+        return row;
+    }
+
+    function makeQuestionBlock() {
+        const block = document.createElement('div');
+        block.className = 'question-block';
+        block.innerHTML =
+            '<div class="question-header"><h3></h3>' +
+            '<button type="button" class="btn btn-sm btn-danger remove-question">Удалить</button></div>' +
+            '<div class="form-group"><label>Текст вопроса</label>' +
+            '<input type="text" class="form-control question-text" required placeholder="Введите текст вопроса"></div>' +
+            '<div class="form-group"><label>Тип вопроса</label>' +
+            '<select class="form-control question-type">' +
+            '<option value="single">Один вариант</option>' +
+            '<option value="multiple">Несколько вариантов</option>' +
+            '<option value="text">Свободный ответ</option>' +
+            '</select></div>' +
+            '<div class="form-group options-group"><label>Варианты ответов</label>' +
+            '<div class="options-list"></div>' +
+            '<button type="button" class="btn btn-sm btn-secondary add-option">+ Вариант</button></div>';
+        return block;
+    }
+
+    addQuestionBtn.addEventListener('click', function() {
+        const block = makeQuestionBlock();
+        container.appendChild(block);
+        block.querySelector('.options-list').appendChild(makeOptionRow());
+        reindex();
+    });
+
+    container.addEventListener('click', function(e) {
+        if (e.target.classList.contains('remove-question')) {
+            if (container.querySelectorAll('.question-block').length > 1) {
+                e.target.closest('.question-block').remove();
+                reindex();
+            }
+        } else if (e.target.classList.contains('add-option')) {
+            const list = e.target.closest('.question-block').querySelector('.options-list');
+            list.appendChild(makeOptionRow());
+            reindex();
+        } else if (e.target.classList.contains('remove-option')) {
+            const row = e.target.closest('.option-row');
+            const list = row.parentElement;
+            row.remove();
+            // Always keep at least one empty option row for usability.
+            if (list.querySelectorAll('.option-row').length === 0) {
+                list.appendChild(makeOptionRow());
+            }
+            reindex();
+        }
+    });
+
+    container.addEventListener('change', function(e) {
+        if (e.target.classList.contains('question-type')) {
+            toggleOptions(e.target);
+        }
+    });
+
+    reindex();
+})();
+</script>
+
+<style>
+.question-block {
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 16px;
+    margin-bottom: 16px;
+    background: #fafafa;
+}
+.question-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+.question-header h3 {
+    margin: 0;
+    font-size: 16px;
+}
+.form-actions {
+    margin-top: 24px;
+    display: flex;
+    gap: 12px;
+}
+.btn-secondary {
+    margin-bottom: 16px;
+}
+.option-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 6px;
+}
+.option-row .option-input {
+    flex: 1;
+}
+.option-row .remove-option {
+    margin-top: 0;
+    padding: 4px 10px;
+}
+</style>
+{% endblock %}

@@ -6,7 +6,7 @@ database/session.init_db() so tables are registered on Base.metadata.
 from datetime import datetime
 from typing import List, Optional
 
-from sqlalchemy import DateTime, ForeignKey, String, Text, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database.base import Base
@@ -23,6 +23,8 @@ class Survey(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), nullable=False
     )
+    # Inactive surveys return 404 to respondents (Этап 3 requirement).
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     owner_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True

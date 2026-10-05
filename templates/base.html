@@ -27,7 +27,7 @@
     <nav>
         {% if user %}
             <span class="muted" style="color:#cfd8e3;">{{ user.email }}</span>
-            <a href="/account">Кабинет</a>
+            <a href="/dashboard">Мои опросы</a>
             <form action="/logout" method="post" style="display:inline;">
                 <button type="submit" style="margin:0;padding:6px 12px;font-size:14px;">Выйти</button>
             </form>

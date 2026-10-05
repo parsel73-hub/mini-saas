@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block title %}{{ survey.title }}{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1>{{ survey.title }}</h1>
+    {% if survey.description %}
+    <p class="text-muted">{{ survey.description }}</p>
+    {% endif %}
+
+    {% if error %}
+    <div class="alert alert-danger">{{ error }}</div>
+    {% endif %}
+
+    <form method="post" action="/survey/{{ survey.slug }}/submit" id="survey-form">
+        {% for question in survey.questions %}
+        <div class="question-block" style="border:1px solid #ddd;border-radius:6px;padding:16px;margin-bottom:16px;background:#fafafa;">
+            <h3 style="margin-top:0;">{{ loop.index }}. {{ question.text }}</h3>
+
+            {% if question.type == 'single' %}
+                <div class="options-group">
+                    {% for option in question.options %}
+                    <div class="form-check" style="margin-bottom:6px;">
+                        <input type="radio" class="form-check-input"
+                               id="q{{ question.id }}_opt{{ option.id }}"
+                               name="answer_{{ question.id }}"
+                               value="{{ option.id }}">
+                        <label class="form-check-label" for="q{{ question.id }}_opt{{ option.id }}">{{ option.text }}</label>
+                    </div>
+                    {% endfor %}
+                </div>
+
+            {% elif question.type == 'multiple' %}
+                <div class="options-group">
+                    {% for option in question.options %}
+                    <div class="form-check" style="margin-bottom:6px;">
+                        <input type="checkbox" class="form-check-input"
+                               id="q{{ question.id }}_opt{{ option.id }}"
+                               name="answer_{{ question.id }}"
+                               value="{{ option.id }}">
+                        <label class="form-check-label" for="q{{ question.id }}_opt{{ option.id }}">{{ option.text }}</label>
+                    </div>
+                    {% endfor %}
+                </div>
+
+            {% elif question.type == 'text' %}
+                <div class="form-group">
+                    <textarea class="form-control"
+                              id="q{{ question.id }}_text"
+                              name="answer_{{ question.id }}"
+                              rows="3"
+                              placeholder="Введите ваш ответ"></textarea>
+                </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+
+        <div class="form-actions" style="margin-top:24px;">
+            <button type="submit" class="btn btn-primary">Отправить ответы</button>
+        </div>
+    </form>
+</div>
+
+<style>
+.form-check {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.form-check-input {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+}
+.form-check-label {
+    cursor: pointer;
+}
+</style>
+{% endblock %}
