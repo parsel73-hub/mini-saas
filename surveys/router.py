@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from auth.deps import CurrentUser, get_templates
 from database.session import get_db
+from flash import set_flash
 from surveys.respondent import has_submitted, set_submitted_flag
 from surveys.services import create_survey, parse_questions, save_submission
 
@@ -161,7 +162,9 @@ async def create_survey_submit(
             status_code=422,
         )
 
-    return RedirectResponse(url="/dashboard", status_code=303)
+    response = RedirectResponse(url="/dashboard", status_code=303)
+    set_flash(response, "Опрос создан и доступен по ссылке.", "success")
+    return response
 
 
 @router.get("/survey/{slug}", response_class=HTMLResponse)
@@ -251,6 +254,7 @@ async def submit_survey(
         url=f"/survey/{slug}/thank-you", status_code=303
     )
     set_submitted_flag(response, slug, survey.id)
+    set_flash(response, "Спасибо! Ваши ответы сохранены.", "success")
     return response
 
 

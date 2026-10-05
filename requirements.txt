@@ -1,8 +1,10 @@
-fastapi
-uvicorn[standard]
-sqlalchemy
-jinja2
-python-multipart
-itsdangerous
-bcrypt
-python-dotenv
+# Runtime dependencies pinned to the versions used for the final delivery.
+# Install with: pip install -r requirements.txt
+fastapi==0.142.1
+uvicorn[standard]==0.54.0
+sqlalchemy==2.1.1
+jinja2==3.1.6
+python-multipart==0.0.32
+itsdangerous==2.2.0
+bcrypt==5.0.0
+python-dotenv==1.2.2

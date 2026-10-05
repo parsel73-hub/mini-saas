@@ -7,17 +7,19 @@ from contextlib import asynccontextmanager
 import os
 
 from fastapi import Depends, FastAPI, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from analytics.router import router as analytics_router
-from auth.deps import _LoginRequired
+from auth.deps import OptionalUser, _LoginRequired, get_templates
 from auth.router import router as auth_router
 from config import BASE_DIR
 from database.session import get_db, init_db
+from flash import FLASH_COOKIE_NAME, read_flash
 from surveys.router import router as surveys_router
 
 
@@ -30,7 +32,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Мини-SaaS для опросов", lifespan=lifespan)
 
-# Static assets (Chart.js init helper and friends).
+# Static assets (unified CSS, Chart.js init helper and friends).
 app.mount(
     "/static",
     StaticFiles(directory=os.path.join(BASE_DIR, "static")),
@@ -47,25 +49,57 @@ app.include_router(surveys_router)
 app.include_router(analytics_router)
 
 
+@app.middleware("http")
+async def flash_middleware(request: Request, call_next):
+    """Expose the pending flash message and clear its cookie after use."""
+    request.state.flash = read_flash(request)
+    response = await call_next(request)
+    if FLASH_COOKIE_NAME in request.cookies:
+        response.delete_cookie(FLASH_COOKIE_NAME)
+    return response
+
+
 @app.exception_handler(_LoginRequired)
 async def login_required_handler(request: Request, exc: _LoginRequired) -> RedirectResponse:
     """Redirect guests to /login when a creator-only route requires auth."""
     return RedirectResponse(url="/login", status_code=302)
 
 
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    """Render friendly HTML pages instead of the default JSON errors."""
+    templates = get_templates()
+    if exc.status_code == 404:
+        return templates.TemplateResponse(
+            request,
+            "404.html",
+            {"error": "Страница или опрос не найдены."},
+            status_code=404,
+        )
+    if exc.status_code == 403:
+        return templates.TemplateResponse(
+            request,
+            "403.html",
+            {"error": "У вас нет доступа к этой странице."},
+            status_code=403,
+        )
+    return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
+
+
 @app.get("/", response_class=HTMLResponse)
-def index(db: Session = Depends(get_db)) -> str:
-    """Health check page. Full landing appears on Этапе 3."""
+def index(
+    request: Request,
+    user: OptionalUser,
+    db: Session = Depends(get_db),
+) -> HTMLResponse:
+    """Landing page with a quick database health check."""
     try:
         db.execute(text("SELECT 1"))
         status = "ok"
     except OperationalError:
         status = "db error"
-    return (
-        "<!doctype html><html lang='ru'><meta charset='utf-8'>"
-        "<title>Мини-SaaS для опросов</title>"
-        "<h1>Мини-SaaS для опросов</h1>"
-        f"<p>Статус: {status}</p>"
-        "<p>Каркас и БД готовы. Следующий этап — Auth.</p>"
-        "</html>"
+
+    templates = get_templates()
+    return templates.TemplateResponse(
+        request, "index.html", {"user": user, "status": status}
     )

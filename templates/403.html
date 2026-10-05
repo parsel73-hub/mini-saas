@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+
+{% block title %}Доступ запрещён{% endblock %}
+
+{% block content %}
+<div class="card error-page">
+    <p class="error-code">403</p>
+    <h1>Доступ запрещён</h1>
+    <p>{{ error or "У вас нет доступа к этой странице." }}</p>
+    <div class="form-actions" style="justify-content:center;">
+        <a href="/" class="btn btn-primary">На главную</a>
+        <a href="/dashboard" class="btn btn-secondary">Мои опросы</a>
+    </div>
+</div>
+{% endblock %}

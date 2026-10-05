@@ -7,6 +7,7 @@ from auth import security
 from auth.deps import get_current_user, get_templates, resolve_user
 from auth.models import User
 from database.session import get_db
+from flash import set_flash
 
 router = APIRouter(tags=["auth"])
 
@@ -64,6 +65,7 @@ def register(
         httponly=True,
         samesite="lax",
     )
+    set_flash(response, "Аккаунт создан. Добро пожаловать!", "success")
     return response
 
 
@@ -111,6 +113,7 @@ def login(
         httponly=True,
         samesite="lax",
     )
+    set_flash(response, "Вы вошли в аккаунт.", "success")
     return response
 
 
@@ -119,6 +122,7 @@ def logout() -> RedirectResponse:
     """Clear the session cookie and redirect home."""
     response = RedirectResponse(url="/", status_code=303)
     response.delete_cookie(key=security.SESSION_COOKIE_NAME)
+    set_flash(response, "Вы вышли из аккаунта.", "info")
     return response
 
 

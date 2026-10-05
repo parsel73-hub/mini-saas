@@ -4,32 +4,17 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}Мини-SaaS для опросов{% endblock %}</title>
-    <style>
-        * { box-sizing: border-box; }
-        body { font-family: system-ui, -apple-system, sans-serif; margin: 0; background: #f5f6f8; color: #222; }
-        header { background: #2c3e50; color: #fff; padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; }
-        header a { color: #fff; text-decoration: none; margin-left: 16px; }
-        header .brand { font-weight: 700; font-size: 18px; }
-        main { max-width: 640px; margin: 32px auto; padding: 0 16px; }
-        .card { background: #fff; border-radius: 8px; padding: 24px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
-        label { display: block; margin: 12px 0 4px; font-weight: 600; }
-        input[type=email], input[type=password], input[type=text] { width: 100%; padding: 8px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 15px; }
-        button { background: #2c7be5; color: #fff; border: 0; padding: 10px 18px; border-radius: 6px; font-size: 15px; cursor: pointer; margin-top: 16px; }
-        button:hover { background: #1a5fbf; }
-        .error { background: #fdecea; color: #b3261e; padding: 10px 14px; border-radius: 6px; margin-bottom: 16px; }
-        .muted { color: #666; font-size: 14px; }
-        .links a { margin-right: 12px; }
-    </style>
+    <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
-<header>
-    <span class="brand">Мини-SaaS для опросов</span>
+<header class="site-header">
+    <a class="brand" href="/">Мини-SaaS для опросов</a>
     <nav>
         {% if user %}
-            <span class="muted" style="color:#cfd8e3;">{{ user.email }}</span>
+            <span class="user-email">{{ user.email }}</span>
             <a href="/dashboard">Мои опросы</a>
-            <form action="/logout" method="post" style="display:inline;">
-                <button type="submit" style="margin:0;padding:6px 12px;font-size:14px;">Выйти</button>
+            <form action="/logout" method="post" style="display:inline;margin:0;">
+                <button type="submit" class="btn btn-sm btn-secondary">Выйти</button>
             </form>
         {% else %}
             <a href="/login">Войти</a>
@@ -38,6 +23,12 @@
     </nav>
 </header>
 <main>
+    {# Flash messages: set on a redirect and consumed on the next page. #}
+    {% set flash_msg = request.state.flash if request.state else none %}
+    {% if flash_msg %}
+    <div class="alert alert-{{ flash_msg.c }}">{{ flash_msg.m }}</div>
+    {% endif %}
+
     {% block content %}{% endblock %}
 </main>
 </body>

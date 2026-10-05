@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block title %}Мини-SaaS для опросов{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1>Мини-SaaS для опросов</h1>
+    <p class="muted">
+        Сервис для создания опросов, сбора ответов по уникальной ссылке
+        и просмотра статистики.
+    </p>
+
+    <p class="muted">Статус базы данных: <strong>{{ status }}</strong></p>
+
+    <div class="form-actions">
+        {% if user %}
+        <a href="/dashboard" class="btn btn-primary">Мои опросы</a>
+        <a href="/surveys/create" class="btn btn-secondary">Создать опрос</a>
+        {% else %}
+        <a href="/register" class="btn btn-primary">Начать бесплатно</a>
+        <a href="/login" class="btn btn-link">У меня уже есть аккаунт</a>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -38,9 +38,9 @@ def survey_stats_page(
     if survey.owner_id != current_user.id:
         return templates.TemplateResponse(
             request,
-            "404.html",
-            {"error": "Опрос не найден."},
-            status_code=404,
+            "403.html",
+            {"user": current_user, "error": "Статистика доступна только владельцу опроса."},
+            status_code=403,
         )
 
     stats = survey_stats(db, survey.id)
