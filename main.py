@@ -11,6 +11,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
+from auth.router import router as auth_router
 from database.session import get_db, init_db
 
 
@@ -22,6 +23,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Мини-SaaS для опросов", lifespan=lifespan)
+
+# Auth routes: register / login / logout / account (Этап 2).
+app.include_router(auth_router)
 
 
 @app.get("/", response_class=HTMLResponse)

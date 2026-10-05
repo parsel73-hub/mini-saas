@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Кабинет — Мини-SaaS для опросов{% endblock %}
+{% block content %}
+<div class="card">
+    <h1>Личный кабинет</h1>
+    <p>Вы вошли как <strong>{{ user.email }}</strong>.</p>
+    <p class="muted">Сессия подтверждена подписанной cookie. Создание опросов появится на Этапе 3.</p>
+</div>
+{% endblock %}

@@ -4,5 +4,5 @@ sqlalchemy
 jinja2
 python-multipart
 itsdangerous
-passlib[bcrypt]
+bcrypt
 python-dotenv
